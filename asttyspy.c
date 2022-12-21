@@ -528,61 +528,6 @@ static void show_help(void)
 	printf("(C) 2022 Naveen Albert\n");
 }
 
-/*! \brief Try to determine the AMI password from manager.conf, if we have access to it */
-static int auto_detect_ami_pass(const char *amiusername, char *buf, size_t buflen)
-{
-	FILE *fp;
-	char *line;
-	long int read;
-	size_t len;
-	int found = 0, right_section = 0;
-
-	char searchsection[strlen(amiusername) + 3];
-	snprintf(searchsection, sizeof(searchsection), "[%s]", amiusername);
-
-	fp = fopen("/etc/asterisk/manager.conf", "r");
-	if (!fp) {
-		return -1;
-	}
-
-	while ((read = getline(&line, &len, fp)) != -1) {
-		if (strstr(line, searchsection)) {
-			right_section = 1;
-		} else if (!strncmp(line, "[", 1)) {
-			right_section = 0;
-		} else if (right_section) {
-			if (!strncmp(line, "secret", 6)) {
-				char *secret = strchr(line, '='); /* Get the value for the key */
-				if (!secret) {
-					continue;
-				}
-				/* Skip any leading whitespace */
-				secret++;
-				while (*secret && isspace(*secret)) {
-					secret++;
-				}
-				strncpy(buf, secret, buflen);
-				secret = buf;
-				/* Skip any trailing whitespace */
-				while (*secret) {
-					if (isspace(*secret) || *secret == '\r' || *secret == '\n' || *secret == ';') {
-						*secret = '\0';
-						break;
-					}
-					secret++;
-				}
-				found = 1;
-				break;
-			}
-		}
-	}
-	fclose(fp);
-	if (line) {
-		free(line);
-	}
-	return found ? 0 : -1;
-}
-
 int main(int argc,char *argv[])
 {
 	char c;
@@ -621,9 +566,9 @@ int main(int argc,char *argv[])
 	if (ami_username[0] && !ami_password[0] && !strcmp(ami_host, "127.0.0.1")) {
 		/* If we're running as a privileged user with access to manager.conf, grab the password ourselves, which is more
 		 * secure than getting as a command line arg from the user (and kind of convenient)
-		 * Not that running as a user with access to the Asterisk config is greater either, but, hey...
+		 * Not that running as a user with access to the Asterisk config is great either, but, hey...
 		 */
-		if (auto_detect_ami_pass(ami_username, ami_password, sizeof(ami_password))) {
+		if (ami_auto_detect_ami_pass(ami_username, ami_password, sizeof(ami_password))) {
 			fprintf(stderr, "No password specified, and failed to autodetect from /etc/asterisk/manager.conf\n");
 			return -1;
 		}
