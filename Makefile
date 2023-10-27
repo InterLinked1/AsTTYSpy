@@ -12,7 +12,7 @@ EXE		= asttyspy
 LIBS	= -lm
 RM		= rm -f
 
-MAIN_OBJ := cami.o asttyspy.o
+MAIN_OBJ := asttyspy.o
 
 all : main
 
@@ -20,7 +20,7 @@ all : main
 	$(CC) $(CFLAGS) -c $^
 
 main : $(MAIN_OBJ)
-	$(CC) $(CFLAGS) -o $(EXE) $(LIBS) *.o -ldl
+	$(CC) $(CFLAGS) -o $(EXE) $(LIBS) *.o -ldl -lcami
 
 clean :
 	$(RM) *.i *.o

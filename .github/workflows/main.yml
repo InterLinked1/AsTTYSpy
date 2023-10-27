@@ -27,6 +27,8 @@ jobs:
           pwd
           ls -la
           git clone https://github.com/InterLinked1/cami.git
-          cp -r cami/include .
-          cp cami/cami.c .
+          cd cami
+          make
+          sudo make install
+          cd ..
           make

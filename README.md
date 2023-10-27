@@ -9,24 +9,11 @@ Because this utility can be used with any arbitrary channel, you can use it to a
 
 ## Compiling
 
-This program needs to be statically compiled with CAMI.
+This program needs to be dynamically linked with CAMI.
 
 The latest source for CAMI can be downloaded from: https://github.com/InterLinked1/cami
 
-The following files are required (with this folder hierarchy):
-- cami.c
-- include/cami.h
-- include/cami_actions.h
-(simpleami.c and Makefile from CAMI are not needed)
-
-Your folder hierarchy should this look like this:
-- include/cami.h (from CAMI)
-- include/cami_actions.h (from CAMI)
-- cami.c (from CAMI)
-- asttyspy.c (from AsTTYSpy)
-- Makefile (from AsTTYSpy)
-
-To compile, simply run "make".
+After you have built and installed CAMI, to compile, simply run "make".
 
 Program Dependencies:
 - CAMI:    https://github.com/InterLinked1/cami
@@ -55,8 +42,7 @@ Secondly, the Asterisk Manager Interface (AMI) is also required. You will need t
 
 ### Part B: Building AsTTYSpy
 
-1. Clone the CAMI repo: `https://github.com/InterLinked1/cami.git`
-2. Remove `simpleami.c` and `Makefile`: `rm simpleami.c Makefile`
+1. Clone the CAMI repo: `https://github.com/InterLinked1/cami.git` and build it using the provided instructions
 3. Download `asttyspy.c` and `Makefile` from this repo:
 - `wget https://raw.githubusercontent.com/InterLinked1/AsTTYSpy/master/asttyspy.c`
 - `wget https://raw.githubusercontent.com/InterLinked1/AsTTYSpy/master/Makefile`

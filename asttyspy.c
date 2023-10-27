@@ -83,8 +83,8 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "include/cami.h"
-#include "include/cami_actions.h"
+#include <cami/cami.h>
+#include <cami/cami_actions.h>
 
 #define TTY_MENU_OPTS "ESC +" \
 	" [H] Help" \
