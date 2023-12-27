@@ -112,9 +112,11 @@ static int tty_active = 0;
 static int always_refresh = 0;
 
 /*! \brief Callback function executing asynchronously when new events are available */
-static void ami_callback(struct ami_event *event)
+static void ami_callback(struct ami_session *ami, struct ami_event *event)
 {
 	const char *msg, *channel, *eventname = ami_keyvalue(event, "Event");
+
+	(void) ami;
 
 	if (tty_active == 1 && (!strcmp(eventname, "Newchannel") || !strcmp(eventname, "Hangup") || !strcmp(eventname, "DeviceStateChange"))) {
 		new_channel = 1; /* Keep track of any changes in the channels that exist. */
@@ -161,9 +163,10 @@ cleanup:
 	ami_event_free(event); /* Free event when done with it */
 }
 
-static void simple_disconnect_callback(void)
+static void simple_disconnect_callback(struct ami_session *ami)
 {
 	/* Start with a newline, since we don't know where we were. */
+	(void) ami;
 	fprintf(stderr, "\nAMI was forcibly disconnected...\n");
 	exit(EXIT_FAILURE);
 }
@@ -195,13 +198,13 @@ static int wait_for_input(int timeout)
 
 #define IS_DTMF(x) (isdigit(x) || (x >= 'A' && x <= 'D') || x == '*' || x == '#')
 
-static int send_dtmf(char digit)
+static int send_dtmf(struct ami_session *ami, char digit)
 {
-	int res = ami_action_response_result(ami_action("PlayDTMF", "Channel:%s\r\nDigit:%c", ttychan, digit));
+	int res = ami_action_response_result(ami, ami_action(ami, "PlayDTMF", "Channel:%s\r\nDigit:%c", ttychan, digit));
 	return res;
 }
 
-static int send_msg(const char *typed)
+static int send_msg(struct ami_session *ami, const char *typed)
 {
 	int res;
 	char *tmp, *ttymsg = strdup(typed);
@@ -221,7 +224,7 @@ static int send_msg(const char *typed)
 		tmp++;
 	}
 
-	res = ami_action_response_result(ami_action("TddTx", "Channel:%s\r\nMessage:%s", ttychan, ttymsg));
+	res = ami_action_response_result(ami, ami_action(ami, "TddTx", "Channel:%s\r\nMessage:%s", ttychan, ttymsg));
 	if (!res && !our_turn) {
 		printf("\nCA : "); /* We changed who was typing. */
 		our_turn = 1;
@@ -240,7 +243,7 @@ static int send_msg(const char *typed)
 	return res;
 }
 
-static int handle_input(void)
+static int handle_input(struct ami_session *ami)
 {
 	struct pollfd pfd;
 	int res;
@@ -307,7 +310,7 @@ static int handle_input(void)
 						/* Send number as DTMF */
 						while (*current_digit) {
 							if (IS_DTMF(*current_digit)) {
-								if (send_dtmf(*current_digit)) {
+								if (send_dtmf(ami, *current_digit)) {
 									return -1;
 								}
 								usleep(100000); /* Wait 100ms */
@@ -318,7 +321,7 @@ static int handle_input(void)
 					case '2': /* Disconnect (start over) */
 						return 0;
 					case '4': /* Send greeting memo */
-						if (send_msg("HELLO GA")) {
+						if (send_msg(ami, "HELLO GA")) {
 							return -1;
 						}
 						break;
@@ -335,7 +338,7 @@ static int handle_input(void)
 
 			if (dtmf_mode && IS_DTMF(tmpbuf[0])) {
 				/* Send DTMF, instead of TTY */
-				if (send_dtmf(tmpbuf[0])) {
+				if (send_dtmf(ami, tmpbuf[0])) {
 					return -1;
 				}
 				continue;
@@ -343,7 +346,7 @@ static int handle_input(void)
 
 			assert(num_read == 1);
 			tmpbuf[1] = '\0'; /* Null terminate for string printing */
-			if (send_msg(tmpbuf)) {
+			if (send_msg(ami, tmpbuf)) {
 				return -1;
 			}
 		}
@@ -351,12 +354,12 @@ static int handle_input(void)
 	return -1;
 }
 
-static struct ami_response *print_channels(int *iptr)
+static struct ami_response *print_channels(struct ami_session *ami, int *iptr)
 {
 	int i = *iptr;
 	struct ami_response *resp;
 
-	resp = ami_action_show_channels();
+	resp = ami_action_show_channels(ami);
 	if (!resp) {
 		fprintf(stderr, "Failed to get channel list\n");
 		return NULL;
@@ -385,7 +388,7 @@ static struct ami_response *print_channels(int *iptr)
 	return resp;
 }
 
-static int get_channel(void)
+static int get_channel(struct ami_session *ami)
 {
 	char channo[15];
 	int chan_no;
@@ -403,7 +406,7 @@ static int get_channel(void)
 			if (resp) {
 				ami_resp_free(resp); /* Not needed anymore. */
 			}
-			resp = print_channels(&i);
+			resp = print_channels(ami, &i);
 			if (!resp) {
 				return -1;
 			}
@@ -462,12 +465,11 @@ static void restore_term(int num)
 	tty_active = 0;
 	tcsetattr(STDIN_FILENO, TCSANOW, &origterm); /* Restore the original term settings */
 	pthread_mutex_unlock(&ttymutex);
-	ami_disconnect();
 	fprintf(stderr, "\nAsTTYSpy exiting...\n");
 	exit(EXIT_FAILURE);
 }
 
-static int ttyspy(void)
+static int ttyspy(struct ami_session *ami)
 {
 	tcgetattr(STDIN_FILENO, &origterm);
 	ttyterm = origterm;
@@ -481,12 +483,12 @@ static int ttyspy(void)
 	for (;;) {
 		new_channel = 1;
 		/* If a channel was not provided, prompt for one now. */
-		if (!ttychan[0] && get_channel()) {
+		if (!ttychan[0] && get_channel(ami)) {
 			break;
 		}
 
 		/* Enable TTY on the target channel. */
-		if (ami_action_response_result(ami_action("TddRx", "Channel:%s\r\nOptions:%s", ttychan, TTY_RX_OPTIONS))) {
+		if (ami_action_response_result(ami, ami_action(ami, "TddRx", "Channel:%s\r\nOptions:%s", ttychan, TTY_RX_OPTIONS))) {
 			/* This could be because TTY was already enabled on the channel (can't do it twice) */
 			fprintf(stderr, "Failed to enable TTY on channel %s\n", ttychan);
 			break;
@@ -504,14 +506,15 @@ static int ttyspy(void)
 		tty_active = 2; /* Get set, go! */
 		tcsetattr(STDIN_FILENO, TCSANOW, &ttyterm); /* Apply changes */
 
-		if (handle_input()) {
+		if (handle_input(ami)) {
 			break;
 		}
 		/* Do it on a new channel, so prompt for channel explicitly */
 		ttychan[0] = '\0';
 	}
 
-	ami_disconnect();
+	ami_disconnect(ami);
+	ami_destroy(ami);
 	tcsetattr(STDIN_FILENO, TCSANOW, &origterm); /* Restore the original term settings */
 	return 0;
 }
@@ -535,6 +538,7 @@ int main(int argc,char *argv[])
 	char ami_host[92] = "127.0.0.1"; /* Default to localhost */
 	char ami_username[64] = "";
 	char ami_password[64] = "";
+	struct ami_session *ami;
 
 	while ((c = getopt(argc, argv, getopt_settings)) != -1) {
 		switch (c) {
@@ -579,16 +583,14 @@ int main(int argc,char *argv[])
 		return -1;
 	}
 
-	if (ami_connect(ami_host, 0, ami_callback, simple_disconnect_callback)) {
+	ami = ami_connect(ami_host, 0, ami_callback, simple_disconnect_callback);
+	if (!ami) {
 		return -1;
 	}
-	if (ami_action_login(ami_username, ami_password)) {
+	if (ami_action_login(ami, ami_username, ami_password)) {
 		fprintf(stderr, "Failed to log in with username %s\n", ami_username);
 		return -1;
 	}
 
-	if (ttyspy()) {
-		return -1;
-	}
-	return 0;
+	return ttyspy(ami) ? -1 : 0;
 }

@@ -23,7 +23,7 @@ main : $(MAIN_OBJ)
 	$(CC) $(CFLAGS) -o $(EXE) $(LIBS) *.o -ldl -lcami
 
 clean :
-	$(RM) *.i *.o
+	$(RM) *.i *.o $(EXE)
 
 .PHONY: all
 .PHONY: main
